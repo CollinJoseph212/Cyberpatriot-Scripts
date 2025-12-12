@@ -6,7 +6,6 @@ echo          Admin/guest
 echo ================================
 
 :admin
-cls
 set /p "choicea= Would you like to enable Admin account? y/n"
 if %choicea% == y net user administrator /active:yes goto guest
 if %choicea% == y goto guest
