@@ -3,8 +3,9 @@ title CP script
 Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
 
 :main
-echo This script was last updated December 11th
-echo There is some bug still in this and might mess up
+echo ==================================================
+echo            CyberPatriot Windows Script
+echo ==================================================
 echo.
 echo Ready to start?
 echo.
@@ -12,7 +13,7 @@ echo.
 set /p "start=y/n"
 
 if %start%== y goto :firewall
-goto :main
+if %start%== n goto :main
 
 :firewall
 cls
