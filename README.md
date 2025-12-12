@@ -1,2 +1,2 @@
 # Cyberpatriot-Scripts
-This repository is has some scripts to help during competitions 
+Welcome to the Cyberpatriot Script repository. Some scripts in this reposittory has some bugs and things that I have to fix, but they work for right now.
