@@ -1,0 +1,173 @@
+@echo off
+title CP script
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+
+:main
+echo This script was last updated December 11th
+echo There is some bug still in this and might mess up
+echo.
+echo Ready to start?
+echo.
+
+set /p "start=y/n"
+
+if %start%== y goto :firewall
+goto :main
+
+:firewall
+cls
+set /p "fwc=Would you likee to enable the firewall?"
+if %fwc%== y netsh advfirewall set allprofiles state on
+if %fwc%== n goto :Services
+
+:Services
+cls
+REM Telnet
+set /p "telnet=Would you like to disable telnet?"
+if %telnet%== y dism /online /disable-Feature /FeatureName:TelnetClient
+if %telnet%== y dism /online /disable-Feature /FeatureName:TelnetServer
+if %telnet%== y sc stop "TlntSvr"
+if %telnet%== y sc config "TlntSvr" start= disabled
+if %telnet%== n set /p "rdp=Would you like to disable ALL of Remote desktop services?"
+REM RDP
+if %rdp%== y sc stop "TermService"
+if %rdp%== y sc config "TermService" start= disabled
+if %rdp%== y sc stop "SessionEnv"
+if %rdp%== y sc config "SessionEnv" start= disabled
+if %rdp%== y sc stop "UmRdpService"
+if %rdp%== y sc config "UmRdpService" start= disabled
+if %rdp%== y sc stop "RemoteRegristry"
+if %rdp%== y sc config "RemoteRegistry" start= disabled
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 1 /f
+
+
+
+:adminandguest
+cls
+set /p "adminandguest=Would you like to disable the admin and guest account?"
+if %adminandguest%== y net user administrator /active:no
+if %adminandguest%== y net user guest /active:no
+
+:Users
+REM --- GET LIST OF USERS ---
+for /f "skip=4 tokens=1" %%A in ('net user') do (
+    if NOT "%%A"=="The" (
+        if NOT "%%A"=="DefaultAccount" (
+            if NOT "%%A"=="WDAGUtilityAccount" (
+                if NOT "%%A"=="$" (
+                    set USER=%%A
+                    call :UserMenu %%A
+                )
+            )
+        )
+    )
+)
+
+goto AddUserPrompt
+
+
+:UserMenu
+cls
+set CURRENT_USER=%1
+
+echo ==========================================
+echo Managing User: %CURRENT_USER%
+echo ==========================================
+echo.
+echo 1. Remove User
+echo 2. Change Account Type (Admin/Standard)
+echo 3. Change Password
+echo 4. Disable "Password Never Expires"
+echo 5. Skip User
+echo.
+
+set /p choice="Enter your choice (1-5): "
+
+if "%choice%"=="1" goto RemoveUser
+if "%choice%"=="2" goto ChangeType
+if "%choice%"=="3" goto ChangePassword
+if "%choice%"=="4" goto DisablePNE
+if "%choice%"=="5" goto EndUserMenu
+
+echo Invalid choice!
+pause
+goto UserMenu
+
+
+:RemoveUser
+echo Removing user %CURRENT_USER% ...
+net user %CURRENT_USER% /delete
+pause
+goto EndUserMenu
+
+
+:ChangeType
+echo.
+echo What type should %CURRENT_USER% be?
+echo 1. Administrator
+echo 2. Standard User
+set /p tchoice="Select (1-2): "
+
+if "%tchoice%"=="1" (
+    net localgroup Administrators %CURRENT_USER% /add
+    net localgroup Users %CURRENT_USER% /delete
+    echo User set to Administrator.
+)
+
+if "%tchoice%"=="2" (
+    net localgroup Users %CURRENT_USER% /add
+    net localgroup Administrators %CURRENT_USER% /delete
+    echo User set to Standard User.
+)
+pause
+goto EndUserMenu
+
+
+:ChangePassword
+set /p newpass="Enter new password for %CURRENT_USER%: "
+net user %CURRENT_USER% %newpass%
+echo Password changed.
+pause
+goto EndUserMenu
+
+
+:DisablePNE
+wmic useraccount where name="%CURRENT_USER%" set PasswordExpires=True
+echo Password Never Expires disabled.
+pause
+goto EndUserMenu
+
+
+:EndUserMenu
+exit /b
+
+
+:AddUserPrompt
+cls
+echo ==========================================
+echo Would you like to add a new user?
+echo ==========================================
+set /p addchoice="Add user? (Y/N): "
+
+if /I "%addchoice%"=="Y" goto AddUser
+if /I "%addchoice%"=="N" goto End
+
+echo Invalid option.
+goto AddUserPrompt
+
+
+:AddUser
+set /p newuser="Enter new username: "
+set /p newpassword="Enter password: "
+
+net user %newuser% %newpassword% /add
+echo User created.
+
+echo.
+echo Make user admin?
+set /p makeadmin="Make admin? (Y/N): "
+
+if /I "%makeadmin%"=="Y" (
+    net localgroup Administrators %newuser% /add
+    echo User added to Administrators group.
+)
