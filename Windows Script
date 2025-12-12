@@ -7,6 +7,8 @@ echo ==================================================
 echo            CyberPatriot Windows Script
 echo ==================================================
 echo.
+echo This script is to help with the simple stuff in an image like Acct polices, firewall, users, etc
+echo This will still have some bugs in it and that will be chnaged in the future
 echo Ready to start?
 echo.
 
@@ -46,40 +48,80 @@ reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnec
 :adminandguest
 cls
 set /p "adminandguest=Would you like to disable the admin and guest account?"
-if %adminandguest%== y net user administrator /active:no
-if %adminandguest%== y net user guest /active:no
-
-:Users
-REM --- GET LIST OF USERS ---
+if %adminandguest%== y net user administrator /active:no goto :usermenu
+if %adminandguest%== y net user guest /active:no goto :usermenu
+if %adminandguest%== n goto :usermenu
+:usermenu
+cls
+REM -----------------------------
+REM GET USERS & DETERMINE TYPE
+REM -----------------------------
+set count=0
 for /f "skip=4 tokens=1" %%A in ('net user') do (
-    if NOT "%%A"=="The" (
-        if NOT "%%A"=="DefaultAccount" (
-            if NOT "%%A"=="WDAGUtilityAccount" (
-                if NOT "%%A"=="$" (
-                    set USER=%%A
-                    call :UserMenu %%A
+    if not "%%A"=="The" (
+        if not "%%A"=="DefaultAccount" (
+            if not "%%A"=="WDAGUtilityAccount" (
+                if not "%%A"=="Guest" (
+                    set /a count+=1
+                    set user!count!=%%A
+
+                    REM CHECK IF ADMIN
+                    net localgroup Administrators | find /i "%%A" >nul
+                    if !errorlevel! == 0 (
+                        set type!count!=Admin
+                    ) else (
+                        set type!count!=Standard
+                    )
                 )
             )
         )
     )
 )
 
-goto AddUserPrompt
+REM -----------------------------
+REM SHOW USER LIST
+REM -----------------------------
+:UserLoop
+cls
+echo ==========================================
+echo Users on this system:
+echo ==========================================
+echo.
+
+for /l %%i in (1,1,%count%) do (
+    echo %%i. !user%%i!  (!type%%i!)
+)
+
+echo.
+set /p pick="Select a user by number (or type DONE to finish): "
+
+if /i "%pick%"=="done" goto AddUserPrompt
+
+REM VALIDATE SELECTED NUMBER
+if "%pick%"=="" goto UserLoop
+if %pick% GTR %count% goto UserLoop
+if %pick% LSS 1 goto UserLoop
+
+set CURRENT_USER=!user%pick%!
+
+call :UserMenu
+goto UserLoop
 
 
+REM -----------------------------
+REM USER MENU
+REM -----------------------------
 :UserMenu
 cls
-set CURRENT_USER=%1
-
 echo ==========================================
-echo Managing User: %CURRENT_USER%
+echo Managing: %CURRENT_USER%
 echo ==========================================
 echo.
 echo 1. Remove User
 echo 2. Change Account Type (Admin/Standard)
 echo 3. Change Password
 echo 4. Disable "Password Never Expires"
-echo 5. Skip User
+echo 5. Back
 echo.
 
 set /p choice="Enter your choice (1-5): "
@@ -88,10 +130,8 @@ if "%choice%"=="1" goto RemoveUser
 if "%choice%"=="2" goto ChangeType
 if "%choice%"=="3" goto ChangePassword
 if "%choice%"=="4" goto DisablePNE
-if "%choice%"=="5" goto EndUserMenu
+if "%choice%"=="5" exit /b
 
-echo Invalid choice!
-pause
 goto UserMenu
 
 
@@ -99,12 +139,12 @@ goto UserMenu
 echo Removing user %CURRENT_USER% ...
 net user %CURRENT_USER% /delete
 pause
-goto EndUserMenu
+exit /b
 
 
 :ChangeType
 echo.
-echo What type should %CURRENT_USER% be?
+echo Make %CURRENT_USER%:
 echo 1. Administrator
 echo 2. Standard User
 set /p tchoice="Select (1-2): "
@@ -120,29 +160,29 @@ if "%tchoice%"=="2" (
     net localgroup Administrators %CURRENT_USER% /delete
     echo User set to Standard User.
 )
+
 pause
-goto EndUserMenu
+exit /b
 
 
 :ChangePassword
-set /p newpass="Enter new password for %CURRENT_USER%: "
+set /p newpass="Enter new password: "
 net user %CURRENT_USER% %newpass%
 echo Password changed.
 pause
-goto EndUserMenu
+exit /b
 
 
 :DisablePNE
 wmic useraccount where name="%CURRENT_USER%" set PasswordExpires=True
-echo Password Never Expires disabled.
+echo Password never expires disabled.
 pause
-goto EndUserMenu
-
-
-:EndUserMenu
 exit /b
 
 
+REM -----------------------------
+REM ADD NEW USER
+REM -----------------------------
 :AddUserPrompt
 cls
 echo ==========================================
@@ -150,10 +190,9 @@ echo Would you like to add a new user?
 echo ==========================================
 set /p addchoice="Add user? (Y/N): "
 
-if /I "%addchoice%"=="Y" goto AddUser
 if /I "%addchoice%"=="N" goto End
+if /I "%addchoice%"=="Y" goto AddUser
 
-echo Invalid option.
 goto AddUserPrompt
 
 
@@ -164,11 +203,9 @@ set /p newpassword="Enter password: "
 net user %newuser% %newpassword% /add
 echo User created.
 
-echo.
-echo Make user admin?
 set /p makeadmin="Make admin? (Y/N): "
 
 if /I "%makeadmin%"=="Y" (
     net localgroup Administrators %newuser% /add
-    echo User added to Administrators group.
+    echo Added to Administrators group.
 )
